@@ -2,14 +2,19 @@ package oop;
 
 import java.util.Scanner;
 
+import oop.model.User;
+import oop.service.CardService;
+import oop.service.UserService;
+
 public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        UserService service = new UserService();
+        UserService userService = new UserService();
+        CardService cardService = new CardService();
         int choice;
 
         do {
-            System.out.println("\n=== MENU ===");
+            System.out.println("\n=== MAIN MENU ===");
             System.out.println("1. Register");
             System.out.println("2. View Registered Users");
             System.out.println("3. Login");
@@ -32,7 +37,7 @@ public class Main {
                     String password = scanner.nextLine();
 
                     User user = new User(firstName, lastName, dob, username, password);
-                    service.register(user);
+                    userService.register(user);
                     System.out.println("Registered successfully!");
                     break;
 
@@ -45,12 +50,12 @@ public class Main {
 
                     switch (subChoice) {
                         case 1:
-                            service.showAll();
+                            userService.showAll();
                             break;
                         case 2:
                             System.out.print("Enter name to search: ");
                             String search = scanner.nextLine();
-                            service.findByName(search);
+                            userService.findByName(search);
                             break;
                         default:
                             System.out.println("Invalid option");
@@ -59,14 +64,17 @@ public class Main {
 
                 case 3:
                     int attempts = 0;
+                    String loggedInUser = null;
+
                     while (attempts < 3) {
                         System.out.print("Enter username: ");
                         String loginUser = scanner.nextLine();
                         System.out.print("Enter password: ");
                         String loginPass = scanner.nextLine();
 
-                        if (service.login(loginUser, loginPass)) {
+                        if (userService.login(loginUser, loginPass)) {
                             System.out.println("Login successful!");
+                            loggedInUser = loginUser;
                             break;
                         } else {
                             attempts++;
@@ -76,6 +84,101 @@ public class Main {
                                 System.out.println("Account locked! Too many failed attempts.");
                             }
                         }
+                    }
+
+                    // Banking menu — only if login was successful
+                    if (loggedInUser != null) {
+                        String currentCard = null;
+                        int bankChoice;
+
+                        do {
+                            System.out.println("\n=== BANKING MENU ===");
+                            System.out.println("1. Register New Card");
+                            System.out.println("2. Deposit");
+                            System.out.println("3. Withdraw");
+                            System.out.println("4. View Balance");
+                            System.out.println("5. View Transaction History");
+                            System.out.println("6. Logout");
+                            System.out.print("Choose: ");
+                            bankChoice = scanner.nextInt();
+                            scanner.nextLine();
+
+                            switch (bankChoice) {
+                                case 1:
+                                    System.out.print("Enter 10-digit card number: ");
+                                    String cardNum = scanner.nextLine();
+                                    while (cardNum.length() != 10) {
+                                        System.out.println("Card number must be 10 digits!");
+                                        System.out.print("Enter 10-digit card number: ");
+                                        cardNum = scanner.nextLine();
+                                    }
+
+                                    System.out.println("Choose bank:");
+                                    System.out.println("1. ANZ");
+                                    System.out.println("2. NAB");
+                                    System.out.println("3. CMW");
+                                    System.out.print("Choose: ");
+                                    int bankSelect = scanner.nextInt();
+                                    scanner.nextLine();
+
+                                    String bankName;
+                                    switch (bankSelect) {
+                                        case 1: bankName = "ANZ"; break;
+                                        case 2: bankName = "NAB"; break;
+                                        case 3: bankName = "CMW"; break;
+                                        default: bankName = null;
+                                    }
+
+                                    if (bankName != null) {
+                                        cardService.registerCard(cardNum, bankName, loggedInUser);
+                                    } else {
+                                        System.out.println("Invalid bank");
+                                    }
+                                    break;
+
+                                case 2:
+                                    currentCard = askForCard(scanner, currentCard);
+                                    if (currentCard != null) {
+                                        System.out.print("Enter amount to deposit: ");
+                                        double depositAmount = scanner.nextDouble();
+                                        scanner.nextLine();
+                                        cardService.deposit(currentCard, depositAmount);
+                                    }
+                                    break;
+
+                                case 3:
+                                    currentCard = askForCard(scanner, currentCard);
+                                    if (currentCard != null) {
+                                        System.out.print("Enter amount to withdraw: ");
+                                        double withdrawAmount = scanner.nextDouble();
+                                        scanner.nextLine();
+                                        cardService.withdraw(currentCard, withdrawAmount);
+                                    }
+                                    break;
+
+                                case 4:
+                                    currentCard = askForCard(scanner, currentCard);
+                                    if (currentCard != null) {
+                                        cardService.viewBalance(currentCard, loggedInUser);
+                                    }
+                                    break;
+
+                                case 5:
+                                    currentCard = askForCard(scanner, currentCard);
+                                    if (currentCard != null) {
+                                        cardService.viewHistory(currentCard);
+                                    }
+                                    break;
+
+                                case 6:
+                                    System.out.println("Logged out!");
+                                    break;
+
+                                default:
+                                    System.out.println("Invalid option");
+                            }
+
+                        } while (bankChoice != 6);
                     }
                     break;
 
@@ -90,5 +193,18 @@ public class Main {
         } while (choice != 4);
 
         scanner.close();
+    }
+
+    // Helper method — ask for card or reuse current
+    private static String askForCard(Scanner scanner, String currentCard) {
+        if (currentCard != null) {
+            System.out.print("Use current card xxxxxxx" + currentCard.substring(currentCard.length() - 3) + "? (yes/no): ");
+            String answer = scanner.nextLine();
+            if (answer.equals("yes")) {
+                return currentCard;
+            }
+        }
+        System.out.print("Enter card number: ");
+        return scanner.nextLine();
     }
 }
