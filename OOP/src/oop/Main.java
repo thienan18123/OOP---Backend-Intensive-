@@ -1,5 +1,6 @@
 package oop;
 
+import java.math.BigDecimal;
 import java.util.Scanner;
 
 import oop.model.User;
@@ -140,7 +141,7 @@ public class Main {
                                     currentCard = askForCard(scanner, currentCard);
                                     if (currentCard != null) {
                                         System.out.print("Enter amount to deposit: ");
-                                        double depositAmount = scanner.nextDouble();
+                                        BigDecimal depositAmount = scanner.nextBigDecimal();
                                         scanner.nextLine();
                                         cardService.deposit(currentCard, depositAmount);
                                     }
@@ -150,7 +151,7 @@ public class Main {
                                     currentCard = askForCard(scanner, currentCard);
                                     if (currentCard != null) {
                                         System.out.print("Enter amount to withdraw: ");
-                                        double withdrawAmount = scanner.nextDouble();
+                                        BigDecimal withdrawAmount = scanner.nextBigDecimal();
                                         scanner.nextLine();
                                         cardService.withdraw(currentCard, withdrawAmount);
                                     }

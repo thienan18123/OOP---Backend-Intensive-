@@ -1,284 +1,191 @@
 package oop.service;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import oop.model.*;
+import oop.model.base.baseCard;
+
+import java.io.*;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import oop.model.Card;
-import oop.model.Transaction;
-
 public class CardService {
-	
-	private String maskCardNumber(String cardNumber) {
-	    String lastThree = cardNumber.substring(cardNumber.length() - 3);
-	    return "xxxxxxx" + lastThree;
-	}
-	
-	public void registerCard(String cardNumber, String bankName, String username) {
-	    try {
-	        // Step 1: Check if card already exists
-	        BufferedReader reader = new BufferedReader(new FileReader("cards.txt"));
-	        String line;
-	        while ((line = reader.readLine()) != null) {
-	            String[] parts = line.split("\\|");
-	            if (parts[0].equals(cardNumber)) {
-	                System.out.println("Card already exists!");
-	                reader.close();
-	                return;
-	            }
-	        }
-	        reader.close();
 
-	        // Step 2: Card doesn't exist, save it with balance 0
-	        Card card = new Card(cardNumber, bankName, 0.0, username);
-	        BufferedWriter writer = new BufferedWriter(new FileWriter("cards.txt", true));
-	        writer.write(card.toFileString());
-	        writer.newLine();
-	        writer.close();
-	        System.out.println("Card registered successfully!");
+    
+    private baseCard createCard(String[] parts) {
+        String cardNumber = parts[0];
+        String bankName = parts[1];
+        BigDecimal balance = new BigDecimal(parts[2]);
+        String username = parts[3];
 
-	    } catch (IOException e) {
-	        System.out.println("Error: " + e.getMessage());
-	    }
-	}
-	
-	public void deposit(String cardNumber, double amount) {
-	    try {
-	        // Step 1: Read all cards, find the matching one
-	        BufferedReader reader = new BufferedReader(new FileReader("cards.txt"));
-	        String line;
-	        List<String> allLines = new ArrayList<>();
-	        boolean found = false;
+        switch (bankName) {
+            case "ANZ": return new ANZCard(cardNumber, username, balance);
+            case "NAB": return new NABCard(cardNumber, username, balance);
+            case "CMW": return new CMWCard(cardNumber, username, balance);
+            default: return null;
+        }
+    }
 
-	        while ((line = reader.readLine()) != null) {
-	            String[] parts = line.split("\\|");
-	            if (parts[0].equals(cardNumber)) {
-	                found = true;
-	                String bankName = parts[1];
-	                double balance = Double.parseDouble(parts[2]);
+    
+    private baseCard findCard(String cardNumber) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader("cards.txt"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split("\\|");
+                if (parts[0].equals(cardNumber)) {
+                    reader.close();
+                    return createCard(parts);
+                }
+            }
+            reader.close();
+        } catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+        return null;
+    }
 
-	                // Step 2: Check deposit rules
-	                if (bankName.equals("CMW") && amount < 5) {
-	                    System.out.println("CMW minimum deposit is 5 AUD");
-	                    reader.close();
-	                    return;
-	                } else if (!bankName.equals("CMW") && amount < 10) {
-	                    System.out.println("ANZ/NAB minimum deposit is 10 AUD");
-	                    reader.close();
-	                    return;
-	                }
+   
+    private void updateCard(baseCard card) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader("cards.txt"));
+            List<String> allLines = new ArrayList<>();
+            String line;
 
-	                // Step 3: Update balance
-	                balance += amount;
-	                parts[2] = String.valueOf(balance);
-	                allLines.add(String.join("|", parts));
-	                System.out.println("Deposited " + amount + " AUD. New balance: " + balance);
-	            } else {
-	                allLines.add(line);
-	            }
-	        }
-	        reader.close();
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split("\\|");
+                if (parts[0].equals(card.getCardNumber())) {
+                    allLines.add(card.toFileString());  
+                } else {
+                    allLines.add(line);                  
+                }
+            }
+            reader.close();
 
-	        if (!found) {
-	            System.out.println("Card not found!");
-	            return;
-	        }
+            BufferedWriter writer = new BufferedWriter(new FileWriter("cards.txt"));
+            for (String l : allLines) {
+                writer.write(l);
+                writer.newLine();
+            }
+            writer.close();
+        } catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
 
-	        // Step 4: Rewrite file with updated balance
-	        BufferedWriter writer = new BufferedWriter(new FileWriter("cards.txt"));
-	        for (String l : allLines) {
-	            writer.write(l);
-	            writer.newLine();
-	        }
-	        writer.close();
+    
+    private void saveTransaction(String cardNumber, String type, BigDecimal depositAmount) {
+        try {
+            Transaction t = new Transaction(cardNumber, type, depositAmount,
+                    java.time.LocalDate.now().toString());
+            BufferedWriter writer = new BufferedWriter(new FileWriter("transactions.txt", true));
+            writer.write(t.toFileString());
+            writer.newLine();
+            writer.close();
+        } catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
 
-	        // Step 5: Save transaction
-	        Transaction t = new Transaction(cardNumber, "DEPOSIT", amount, java.time.LocalDate.now().toString());
-	        BufferedWriter tWriter = new BufferedWriter(new FileWriter("transactions.txt", true));
-	        tWriter.write(t.toFileString());
-	        tWriter.newLine();
-	        tWriter.close();
+   
 
-	    } catch (IOException e) {
-	        System.out.println("Error: " + e.getMessage());
-	    }
-	}
-	
-	public void withdraw(String cardNumber, double amount) {
-	    try {
-	        // Step 1: Read all cards, find the matching one
-	        BufferedReader reader = new BufferedReader(new FileReader("cards.txt"));
-	        String line;
-	        List<String> allLines = new ArrayList<>();
-	        boolean found = false;
+    public void registerCard(String cardNumber, String bankName, String username) {
+        if (findCard(cardNumber) != null) {
+            System.out.println("Card already exists!");
+            return;
+        }
+        try {
+            String[] parts = {cardNumber, bankName, "0.0", username};
+            baseCard card = createCard(parts);
+            BufferedWriter writer = new BufferedWriter(new FileWriter("cards.txt", true));
+            writer.write(card.toFileString());
+            writer.newLine();
+            writer.close();
+            System.out.println("Card registered successfully!");
+        } catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
 
-	        while ((line = reader.readLine()) != null) {
-	            String[] parts = line.split("\\|");
-	            if (parts[0].equals(cardNumber)) {
-	                found = true;
-	                String bankName = parts[1];
-	                double balance = Double.parseDouble(parts[2]);
-	                
-	                //set bank withdraw limits
-	                
-	                int maxWithdraw;
-	                switch(bankName) {
-	                case "ANZ": maxWithdraw = 1000; break;
-	                case "NAB": maxWithdraw = 2000; break;
-	                case "CMW": maxWithdraw = 3000; break;
-	                default: maxWithdraw = 0;
-	                }
+    public void deposit(String cardNumber, BigDecimal depositAmount) {
+        baseCard card = findCard(cardNumber);
+        if (card == null) {
+            System.out.println("Card not found!");
+            return;
+        }
 
-	                // Step 2: Check withdraw rules
-	                 if (amount > maxWithdraw) {
-	                	 System.out.println(bankName + " limit is " + maxWithdraw + " AUD per withdrawal");
-	                	 reader.close();
-	                	 return;
-	                 }
-	                 
-	                 //minimum balance
-	                 if (balance - amount < 20) {
-	                	 System.out.println("Cannot withdraw. Must keep minumum 20 AUD");
-	                	 System.out.println("Available to withdraw: " + (balance - 20) + " AUD");
-	                	 reader.close();
-	                	 return;
-	                 }
+        BigDecimal oldBalance = card.getBalance();
+        card.deposit(depositAmount);  
 
-	                // Step 3: Update balance
-	                balance -= amount;
-	                parts[2] = String.valueOf(balance);
-	                allLines.add(String.join("|", parts));
-	                System.out.println("Withdrew " + amount + " AUD. New balance: " + balance);
-	            } else {
-	                allLines.add(line);
-	            }
-	        }
-	        reader.close();
+        if (card.getBalance().compareTo(oldBalance) > 0) {  
+            updateCard(card);
+            saveTransaction(cardNumber, "DEPOSIT", depositAmount);
+        }
+    }
 
-	        if (!found) {
-	            System.out.println("Card not found!");
-	            return;
-	        }
+    public void withdraw(String cardNumber, BigDecimal amount) {
+        baseCard card = findCard(cardNumber);
+        if (card == null) {
+            System.out.println("Card not found!");
+            return;
+        }
 
-	        // Step 4: Rewrite file with updated balance
-	        BufferedWriter writer = new BufferedWriter(new FileWriter("cards.txt"));
-	        for (String l : allLines) {
-	            writer.write(l);
-	            writer.newLine();
-	        }
-	        writer.close();
+        BigDecimal oldBalance = card.getBalance();
+        card.withdraw(amount);  
 
-	        // Step 5: Save transaction
-	        Transaction t = new Transaction(cardNumber, "WITHDRAW", amount, java.time.LocalDate.now().toString());
-	        BufferedWriter tWriter = new BufferedWriter(new FileWriter("transactions.txt", true));
-	        tWriter.write(t.toFileString());
-	        tWriter.newLine();
-	        tWriter.close();
+        if (card.getBalance().compareTo(oldBalance) < 0) {  
+            updateCard(card);
+            saveTransaction(cardNumber, "WITHDRAW", amount);
+        }
+    }
 
-	    } catch (IOException e) {
-	        System.out.println("Error: " + e.getMessage());
-	    }
-	}
-	
-	public void viewBalance(String cardNumber, String loggedInUser) {
-	    try {
-	        BufferedReader reader = new BufferedReader(new FileReader("cards.txt"));
-	        String line;
-	        boolean found = false;
+    public void viewBalance(String cardNumber, String name) {
+        baseCard card = findCard(cardNumber);
+        if (card == null) {
+            System.out.println("Card not found!");
+            return;
+        }
+        card.showBalance(name);  
+    }
 
-	        while ((line = reader.readLine()) != null) {
-	            String[] parts = line.split("\\|");
-	            if (parts[0].equals(cardNumber)) {
-	                found = true;
-	                String bankName = parts[1];
-	                double balance = Double.parseDouble(parts[2]);
+    public void viewHistory(String cardNumber) {
+        baseCard card = findCard(cardNumber);
+        if (card == null) {
+            System.out.println("Card not found!");
+            return;
+        }
 
-	                // Different message per bank
-	                switch (bankName) {
-	                    case "NAB":
-	                        System.out.println("Hi " + loggedInUser + ", your card balance on NAB bank is " + balance + " AUD");
-	                        break;
-	                    case "ANZ":
-	                        System.out.println("Your ANZ account " + maskCardNumber(cardNumber) + " balance is " + balance + " AUD");
-	                        break;
-	                    case "CMW":
-	                        System.out.println("CMW bank account with number " + maskCardNumber(cardNumber) + " has balance is " + balance + " AUD");
-	                        break;
-	                }
-	                break;
-	            }
-	        }
-	        reader.close();
+        // NAB only
+        if (!card.getBankName().equals("NAB")) {
+            System.out.println("Transaction history not supported for " + card.getBankName());
+            return;
+        }
 
-	        if (!found) {
-	            System.out.println("Card not found!");
-	        }
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader("transactions.txt"));
+            List<String> transactions = new ArrayList<>();
+            String line;
 
-	    } catch (IOException e) {
-	        System.out.println("Error: " + e.getMessage());
-	    }
-	}
-	
-	public void viewHistory(String cardNumber) {
-	    try {
-	        // Step 1: Find the card's bank
-	        BufferedReader cardReader = new BufferedReader(new FileReader("cards.txt"));
-	        String line;
-	        String bankName = null;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split("\\|");
+                if (parts[0].equals(cardNumber)) {
+                    transactions.add(line);
+                }
+            }
+            reader.close();
 
-	        while ((line = cardReader.readLine()) != null) {
-	            String[] parts = line.split("\\|");
-	            if (parts[0].equals(cardNumber)) {
-	                bankName = parts[1];
-	                break;
-	            }
-	        }
-	        cardReader.close();
+            if (transactions.isEmpty()) {
+                System.out.println("No transactions found");
+                return;
+            }
 
-	        if (bankName == null) {
-	            System.out.println("Card not found!");
-	            return;
-	        }
-
-	        // Step 2: NAB only
-	        if (!bankName.equals("NAB")) {
-	            System.out.println("Transaction history not supported for " + bankName + " bank");
-	            return;
-	        }
-
-	        // Step 3: Read all transactions for this card
-	        BufferedReader reader = new BufferedReader(new FileReader("transactions.txt"));
-	        List<String> transactions = new ArrayList<>();
-
-	        while ((line = reader.readLine()) != null) {
-	            String[] parts = line.split("\\|");
-	            if (parts[0].equals(cardNumber)) {
-	                transactions.add(line);
-	            }
-	        }
-	        reader.close();
-
-	        if (transactions.isEmpty()) {
-	            System.out.println("No transactions found");
-	            return;
-	        }
-
-	        // Step 4: Show last 10 only
-	        System.out.println("\n=== Transaction History (NAB) ===");
-	        int start = Math.max(0, transactions.size() - 10);
-	        for (int i = start; i < transactions.size(); i++) {
-	            String[] parts = transactions.get(i).split("\\|");
-	            System.out.println(parts[3] + " | " + parts[1] + " | " + parts[2] + " AUD");
-	        }
-	        System.out.println("=================================");
-
-	    } catch (IOException e) {
-	        System.out.println("Error: " + e.getMessage());
-	    }
-	}
-
+            System.out.println("\n=== Transaction History (NAB) card " + card.getCardNumber());
+            int start = Math.max(0, transactions.size() - 10);
+            for (int i = start; i < transactions.size(); i++) {
+                String[] parts = transactions.get(i).split("\\|");
+                System.out.println(parts[3] + " | " + parts[1] + " | " + parts[2] + " AUD");
+            }
+        } catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
 }
